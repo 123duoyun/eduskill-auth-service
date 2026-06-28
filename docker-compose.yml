@@ -2,7 +2,7 @@ services:
 
   zitadel:
     restart: always
-    image: "ghcr.io/zitadel/zitadel:${ZITADEL_VERSION:-v4.14.1}"
+    image: "ghcr.io/zitadel/zitadel:${ZITADEL_VERSION:-v4.14.0}"
     user: "0"
     command: 'start-from-init --config /zitadel-config.yaml --steps /zitadel-init-steps.yaml --masterkey MasterkeyNeedsToHave32Characters --tlsMode disabled'
     networks:
@@ -102,6 +102,6 @@ services:
 volumes:
   zitadel-bootstrap:
 
-networks:
-  internal-net:
-    driver: bridge
+# networks:
+#   internal-net:
+#     driver: bridge
