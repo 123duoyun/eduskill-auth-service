@@ -45,17 +45,6 @@ services:
               expected_issuer: "__ZITADEL_ISSUER__"
               expected_audience: "__ZITADEL_CLIENT_ID__"
 
-  - name: auth-frontend-pages
-    url: http://auth-frontend:80
-    routes:
-      - name: auth-service-html
-        hosts:
-          - __KONG_AUTH_HOST__
-        paths:
-          - /
-        strip_path: false
-        preserve_host: true
-
   - name: educlaw-api
     url: http://educlaw-server:3000
     connect_timeout: 5000
