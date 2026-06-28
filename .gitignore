@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-frontend
+.env
+*.log
+test-results
+CLAUDE.md
+.claude
+AGENTS.md
