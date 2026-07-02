@@ -17,6 +17,13 @@ function sanitizeError(err: unknown, fallback: string): string {
 
 type AuthMode = 'login' | 'register';
 
+function validateInviteCode(code: string | undefined): { ok: true } | { ok: false; error: string } {
+  if (!config.inviteRequired) return { ok: true };
+  if (!code) return { ok: false, error: '注册需要提供邀请码' };
+  if (!config.inviteCodes.includes(code)) return { ok: false, error: '邀请码无效' };
+  return { ok: true };
+}
+
 interface LoginTokens {
   access_token: string;
   id_token?: string;
@@ -260,6 +267,14 @@ async function runPasswordAuth(mode: AuthMode, req: Request, res: Response): Pro
   if (mode === 'register' && !email) {
     res.status(400).json({ error: 'email is required for registration' });
     return;
+  }
+
+  if (mode === 'register') {
+    const inviteCheck = validateInviteCode(req.body?.inviteCode);
+    if (!inviteCheck.ok) {
+      res.status(400).json({ error: inviteCheck.error });
+      return;
+    }
   }
 
   const tokens =
@@ -508,7 +523,14 @@ router.post('/auth/sms/register', async (req: Request, res: Response) => {
       return;
     }
 
-    // 3. 创建用户并自动登录
+    // 3. 校验邀请码
+    const inviteCheck = validateInviteCode(req.body?.inviteCode);
+    if (!inviteCheck.ok) {
+      res.status(400).json({ error: inviteCheck.error });
+      return;
+    }
+
+    // 4. 创建用户并自动登录
     const tokens = await registerWithPhone(phone, username, password);
     res.json(tokens);
   } catch (err: any) {

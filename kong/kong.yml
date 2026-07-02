@@ -1,41 +1,16 @@
 _format_version: "3.0"
 
 services:
-  - name: zitadel
-    url: http://zitadel:8080
-    routes:
-      - name: zitadel-routes
-        hosts:
-          - __KONG_AUTH_HOST__
-        paths:
-          - /
-        strip_path: false
-        preserve_host: true
-
-  - name: zitadel-login
-    url: http://zitadel-login:3000
-    routes:
-      - name: zitadel-login-ui
-        hosts:
-          - __KONG_AUTH_HOST__
-        paths:
-          - /ui/v2/login
-        strip_path: false
-        preserve_host: true
-
-  - name: auth-backend-api
+  - name: educlaw-auth
     url: http://auth-backend:3000
-    connect_timeout: 5000
-    read_timeout: 3600000
-    write_timeout: 3600000
     routes:
-      - name: auth-service-api
+      - name: educlaw-auth-routes
         hosts:
-          - __KONG_AUTH_HOST__
           - __KONG_APP_HOST__
         paths:
           - /auth
           - /sms/send
+          - /healthz
         strip_path: false
         preserve_host: true
         plugins:

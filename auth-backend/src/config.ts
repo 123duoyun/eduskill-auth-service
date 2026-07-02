@@ -13,7 +13,7 @@ export const config = {
     return process.env.ZITADEL_INTERNAL_ISSUER || this.zitadelIssuer;
   },
   zitadelClientId: process.env.ZITADEL_CLIENT_ID || '',
-  zitadelServicePat: readPat(),
+  zitadelServicePat: process.env.ZITADEL_SERVICE_PAT || readPat(),
   zitadelLoginRedirectUri:
     process.env.ZITADEL_LOGIN_REDIRECT_URI || 'http://auth-service:3000/auth/callback',
   zitadelProjectId: process.env.ZITADEL_PROJECT_ID || '',
@@ -22,4 +22,6 @@ export const config = {
   aliyunAccessKeySecret: process.env.ALIYUN_ACCESS_KEY_SECRET || '',
   aliyunSmsSignName: process.env.ALIYUN_SMS_SIGN_NAME || '',
   aliyunSmsTemplateCode: process.env.ALIYUN_SMS_TEMPLATE_CODE || '',
+  inviteCodes: (process.env.INVITE_CODES || '').split(',').map((c: string) => c.trim()).filter(Boolean),
+  inviteRequired: (process.env.INVITE_REQUIRED || 'false').toLowerCase() === 'true',
 };

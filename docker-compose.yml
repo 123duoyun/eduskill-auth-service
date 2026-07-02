@@ -1,52 +1,4 @@
 services:
-
-  zitadel:
-    restart: always
-    image: "ghcr.io/zitadel/zitadel:${ZITADEL_VERSION:-v4.14.0}"
-    user: "0"
-    command: 'start-from-init --config /zitadel-config.yaml --steps /zitadel-init-steps.yaml --masterkey MasterkeyNeedsToHave32Characters --tlsMode disabled'
-    networks:
-      - internal-net
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./example-zitadel-config.yaml:/zitadel-config.yaml:ro
-      - ./example-zitadel-init-steps.yaml:/zitadel-init-steps.yaml:ro
-      - zitadel-bootstrap:/zitadel/bootstrap
-
-  zitadel-login:
-    restart: unless-stopped
-    image: "ghcr.io/zitadel/zitadel-login:${ZITADEL_VERSION:-latest}"
-    user: "0"
-    environment:
-      - ZITADEL_API_URL=${ZITADEL_ISSUER:-http://auth.localhost}
-      - NEXT_PUBLIC_BASE_PATH=/ui/v2/login
-      - ZITADEL_SERVICE_USER_TOKEN_FILE=/zitadel/bootstrap/login-client.pat
-    depends_on:
-      - zitadel
-      - kong
-    networks:
-      - internal-net
-    volumes:
-      - zitadel-bootstrap:/zitadel/bootstrap:ro
-
-  postgres:
-    image: m.daocloud.io/docker.io/library/postgres:17
-    environment:
-      POSTGRES_DB: educlaw
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: 123456
-    ports:
-      - "${PG_PORT:-5432}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d educlaw"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - internal-net
-
   kong:
     image: m.daocloud.io/docker.io/library/kong:3.6
     environment:
@@ -76,7 +28,6 @@ services:
       internal-net:
         aliases:
           - eduskill.localhost
-          - auth.localhost
     restart: unless-stopped
 
   auth-backend:
@@ -90,18 +41,18 @@ services:
       - HOST=0.0.0.0
       - PORT=3000
       - ZITADEL_SERVICE_PAT_FILE=/zitadel/bootstrap/login-client.pat
+      - ZITADEL_SERVICE_PAT=${ZITADEL_SERVICE_PAT:-''}
+      - INVITE_CODES=${INVITE_CODES:-}
+      - INVITE_REQUIRED=${INVITE_REQUIRED:-false}
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
     networks:
       - internal-net
-    depends_on:
-      zitadel:
-        condition: service_started
     restart: unless-stopped
 
 volumes:
   zitadel-bootstrap:
 
-# networks:
-#   internal-net:
-#     driver: bridge
+networks:
+  internal-net:
+    driver: bridge
