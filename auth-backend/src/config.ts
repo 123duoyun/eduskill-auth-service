@@ -16,6 +16,7 @@ export const config = {
   zitadelServicePat: process.env.ZITADEL_SERVICE_PAT || readPat(),
   zitadelLoginRedirectUri:
     process.env.ZITADEL_LOGIN_REDIRECT_URI || 'http://auth-service:3000/auth/callback',
+  zitadelOrgId: process.env.ZITADEL_ORG_ID || '',
   zitadelProjectId: process.env.ZITADEL_PROJECT_ID || '',
   zitadelDefaultRoleKey: process.env.ZITADEL_DEFAULT_ROLE_KEY || 'EduClaw',
   aliyunAccessKeyId: process.env.ALIYUN_ACCESS_KEY_ID || '',

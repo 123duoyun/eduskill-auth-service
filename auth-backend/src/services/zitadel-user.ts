@@ -34,6 +34,10 @@ function pat(): string {
   return config.zitadelServicePat;
 }
 
+function orgHeader(): Record<string, string> {
+  return config.zitadelOrgId ? { 'x-zitadel-orgid': config.zitadelOrgId } : {};
+}
+
 function mapUser(u: ZitadelHumanUser): ZitadelUser | undefined {
   const id = u.userId;
   if (!id) return undefined;
@@ -60,13 +64,17 @@ export async function findById(id: string): Promise<ZitadelUser | undefined> {
 }
 
 export async function searchUsers(queries: unknown[]): Promise<ZitadelHumanUser[]> {
+  const body: Record<string, unknown> = { queries };
+  if (config.zitadelOrgId) {
+    body.organization = { orgId: config.zitadelOrgId };
+  }
   const res = await fetch(`${issuer()}/v2/users`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${pat()}`,
     },
-    body: JSON.stringify({ queries }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) return [];
   const data = (await res.json()) as { result?: ZitadelHumanUser[] };
@@ -78,15 +86,19 @@ export async function listAllUsers(): Promise<ZitadelUser[]> {
   const pageSize = 100;
   let offset = 0;
   while (true) {
+    const body: Record<string, unknown> = {
+      query: { offset: String(offset), limit: pageSize, asc: true },
+    };
+    if (config.zitadelOrgId) {
+      body.organization = { orgId: config.zitadelOrgId };
+    }
     const res = await fetch(`${issuer()}/v2/users`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${pat()}`,
       },
-      body: JSON.stringify({
-        query: { offset: String(offset), limit: pageSize, asc: true },
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const text = await res.text();
@@ -114,6 +126,7 @@ export async function assignUserRole(userId: string, roleKey: string): Promise<v
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${pat()}`,
+      ...orgHeader(),
     },
     body: JSON.stringify({
       projectId,
@@ -138,6 +151,7 @@ export async function getUserRoles(userId: string): Promise<string[]> {
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${pat()}`,
+      ...orgHeader(),
     },
     body: JSON.stringify({
       queries: [

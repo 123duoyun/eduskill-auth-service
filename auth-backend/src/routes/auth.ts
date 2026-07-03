@@ -62,6 +62,9 @@ function createAuthUrl(issuer: string, codeChallenge: string, state: string): UR
   authUrl.searchParams.set('code_challenge', codeChallenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
   authUrl.searchParams.set('state', state);
+  if (config.zitadelOrgId) {
+    authUrl.searchParams.set('orgId', config.zitadelOrgId);
+  }
   return authUrl;
 }
 
@@ -215,15 +218,20 @@ async function registerWithPassword(username: string, email: string, password: s
   }
 
   const givenName = username.replace(/[^a-zA-Z0-9]/g, '') || username;
+  const userPayload: Record<string, unknown> = {
+    username,
+    profile: { givenName, familyName: 'User' },
+    email: { email: normalizedEmail, isVerified: true },
+    password: { password, changeRequired: false },
+  };
+  if (config.zitadelOrgId) {
+    userPayload.organization = { orgId: config.zitadelOrgId };
+  }
+
   const createRes = await fetch(`${getIssuer()}/v2/users/human`, {
     method: 'POST',
     headers: serviceJsonHeaders(),
-    body: JSON.stringify({
-      username,
-      profile: { givenName, familyName: 'User' },
-      email: { email: normalizedEmail, isVerified: true },
-      password: { password, changeRequired: false },
-    }),
+    body: JSON.stringify(userPayload),
   });
 
   if (!createRes.ok) {
@@ -405,16 +413,21 @@ async function registerWithPhone(
 ): Promise<LoginTokens> {
   const givenName = username.replace(/[^a-zA-Z0-9]/g, '') || username;
   const e164Phone = toE164Phone(phone);
+  const userPayload: Record<string, unknown> = {
+    username,
+    profile: { givenName, familyName: 'User' },
+    email: { email: `${phone}@phone.local`, isVerified: true },
+    phone: { phone: e164Phone, isVerified: true },
+    password: { password, changeRequired: false },
+  };
+  if (config.zitadelOrgId) {
+    userPayload.organization = { orgId: config.zitadelOrgId };
+  }
+
   const createRes = await fetch(`${getIssuer()}/v2/users/human`, {
     method: 'POST',
     headers: serviceJsonHeaders(),
-    body: JSON.stringify({
-      username,
-      profile: { givenName, familyName: 'User' },
-      email: { email: `${phone}@phone.local`, isVerified: true },
-      phone: { phone: e164Phone, isVerified: true },
-      password: { password, changeRequired: false },
-    }),
+    body: JSON.stringify(userPayload),
   });
 
   if (!createRes.ok) {
