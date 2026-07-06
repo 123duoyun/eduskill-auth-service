@@ -10,7 +10,10 @@
   - [密码登录/注册](#1-密码登录注册)
   - [短信验证码登录/注册](#2-短信验证码登录注册)
   - [登出](#3-登出)
-  - [获取当前用户信息](#4-获取当前用户信息)
+  - [忘记密码（发送重置链接）](#4-忘记密码发送重置链接)
+  - [健康检查](#5-健康检查)
+  - [Zitadel 自定义 SMS Provider](#6-zitadel-自定义-sms-provider)
+  - [获取当前用户信息](#7-获取当前用户信息)
 - [Token 使用说明](#token-使用说明)
 - [错误码与错误处理](#错误码与错误处理)
 - [安全机制](#安全机制)
@@ -188,7 +191,7 @@ Auth Service 是基于 **Zitadel** 身份认证平台构建的认证服务，提
 
 ```json
 {
-  "error": "短信发送过于频繁，请稍后再试",
+  "error": "发送过于频繁，请稍后再试",
   "retryAfterSeconds": 180
 }
 ```
@@ -285,11 +288,93 @@ Auth Service 是基于 **Zitadel** 身份认证平台构建的认证服务，提
 
 ---
 
-### 4. 获取当前用户信息
+### 4. 忘记密码（发送重置链接）
+
+#### `POST /auth/forgot-password`
+
+触发 ZITADEL 向用户已验证邮箱发送密码重置邮件。**出于安全原因，无论邮箱是否存在均返回成功响应，防止枚举攻击。**
+
+**请求：**
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| email | string | ✅ | 用户注册时使用的邮箱地址 |
+
+**成功响应（200）：**
+
+```json
+{
+  "ok": true
+}
+```
+
+> 📌 即使邮箱未注册，也返回 `{ "ok": true }`。建议前端在发送成功后提示用户"重置链接已发送，请查收邮箱。"
+
+**失败响应：**
+- `400` — 缺少 email 参数
+- `500` — ZITADEL API 调用失败（一般不会发生，除非服务内部错误）
+
+---
+
+### 5. 健康检查
+
+#### `GET /healthz`
+
+健康检查端点，无需认证。
+
+**成功响应（200）：**
+
+```json
+{
+  "ok": true
+}
+```
+
+---
+
+### 6. Zitadel 自定义 SMS Provider
+
+#### `POST /sms/send`
+
+此端点供 Zitadel 调用，作为自定义短信发送提供商。Zitadel 会将验证码短信发送请求转发到此接口。
+
+**请求体（Zitadel 格式）：**
+
+```json
+{
+  "recipient": "+8613800138000",
+  "message": "您的验证码是：123456"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| recipient | string | ✅ | E.164 格式手机号 |
+| message | string | 否 | 包含验证码的消息文本 |
+
+**成功响应（200）：**
+
+```json
+{
+  "success": true
+}
+```
+
+> 📌 此端点仅用于 Zitadel 集成，普通业务接入无需使用。
+
+---
+
+### 7. 获取当前用户信息
 
 #### `GET /auth/me`
 
-需要携带有效的 access_token。
+需要携带有效的 access_token（通过 Kong 网关访问）。
 
 **请求头：**
 
@@ -312,6 +397,7 @@ Authorization: Bearer <access_token>
 **失败响应：**
 - `401` — 未认证或 Token 无效
 - `401` — 用户不存在
+- `500` — 服务器内部错误
 
 ---
 
@@ -323,10 +409,12 @@ Authorization: Bearer <access_token>
 
 | Token | 用途 | 建议存储方式 |
 |-------|------|-------------|
-| `access_token` | 访问受保护资源的凭证 | 内存 / httpOnly Cookie |
+| `access_token` | 访问受保护资源的凭证（JWT） | 内存 / httpOnly Cookie |
 | `id_token` | 用户身份信息（JWT，可解码获取用户资料） | 按需使用 |
 | `refresh_token` | 用于刷新 access_token | 安全存储（httpOnly Cookie） |
 | `expires_in` | access_token 有效期（秒），默认 43200（12小时） | — |
+| `token_type` | Token 类型，固定为 `"Bearer"` | — |
+| `scope` | 授权范围，如 `"openid profile email offline_access"` | — |
 
 ### 在请求中使用 Token
 
@@ -337,9 +425,14 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
 ```
 
 Kong 网关会自动：
-1. 验证 JWT 签名和有效期
-2. 提取用户信息注入到 `X-User-Id`、`X-User-Username`、`X-User-Email` 请求头
-3. 移除原始 Authorization 头后转发给上游服务
+1. 验证 JWT 签名（使用 Zitadel JWKS）和有效期
+2. 提取用户信息注入到以下请求头：
+   - `X-User-Id` — 用户唯一标识
+   - `X-User-Username` — 用户名
+   - `X-User-Email` — 用户邮箱
+3. 转发给上游服务（上游服务无需再验证 JWT）
+
+> 📌 业务服务应从 `X-User-*` 头获取用户信息，不要尝试解析或验证 JWT。
 
 ---
 
@@ -353,7 +446,7 @@ Kong 网关会自动：
 | 404 | 资源不存在 | 手机号未注册 |
 | 409 | 冲突 | 手机号已被注册 |
 | 429 | 请求过于频繁 | 短信发送频率超限 |
-| 500 | 服务器内部错误 | Zitadel 服务异常等 |
+| 500 | 服务器内部错误 | Zitadel 服务异常、短信发送失败等 |
 
 **错误响应格式：**
 
@@ -364,6 +457,37 @@ Kong 网关会自动：
 ```
 
 > 📌 出于安全考虑，内部错误信息会被脱敏处理。以中文开头的错误信息会原样返回，其他错误信息会被替换为通用提示。
+
+### 常见验证错误
+
+**密码登录/注册 (`POST /auth/password`)：**
+
+| 错误信息 | 原因 |
+|---------|------|
+| `mode must be "login" or "register"` | mode 字段缺失或值不正确 |
+| `username and password required` | 用户名或密码为空 |
+| `email is required for registration` | 注册时未提供邮箱 |
+| `该用户名已存在` | 注册时用户名已被占用 |
+| `该邮箱已被注册` | 注册时邮箱已被占用 |
+| `注册需要提供邀请码` | 开启邀请码验证但未提供 |
+| `邀请码无效` | 提供的邀请码不正确 |
+| `用户名或密码错误` | 登录时凭据不正确（脱敏后的通用提示） |
+
+**短信验证码 (`POST /auth/sms/*`)：**
+
+| 错误信息 | 原因 |
+|---------|------|
+| `手机号不能为空` | phone 字段为空 |
+| `phone, code, otpId 必填` | 短信登录时缺少必填字段 |
+| `phone, code, otpId, username, password 必填` | 短信注册时缺少必填字段 |
+| `验证码不存在或已过期` | otpId 无效或已使用 |
+| `验证码已过期` | 验证码超过 5 分钟有效期 |
+| `验证码尝试次数过多` | 同一验证码验证超过 5 次 |
+| `验证码错误` | 输入的验证码不正确 |
+| `该手机号未注册` | 短信登录时手机号未注册 |
+| `该手机号已注册` | 短信注册时手机号已注册 |
+| `发送过于频繁，请稍后再试` | 短信发送频率超限（429） |
+| `验证码发送失败` | 阿里云短信服务异常 |
 
 ---
 
@@ -378,16 +502,32 @@ Kong 网关会自动：
 | 最大验证尝试次数 | 5 次 |
 | 短信频率限制 | 每个手机号 10 分钟内最多 3 条 |
 
+### 组织隔离
+
+当环境变量 `ZITADEL_ORG_ID` 设置后，服务会启用组织隔离模式：
+
+- **用户注册**：新用户自动创建到指定组织下
+- **用户查询**：仅查询指定组织内的用户
+- **角色管理**：在指定组织上下文中分配和查询角色
+- **OIDC 认证**：授权请求自动关联到指定组织
+
+> 📌 未设置 `ZITADEL_ORG_ID` 时，使用 Zitadel 默认组织。
+
 ### 邀请码机制
 
 当环境变量 `INVITE_REQUIRED=true` 时，注册接口必须提供有效的邀请码。邀请码通过 `INVITE_CODES` 环境变量配置（逗号分隔）。
 
 ### CORS
 
-允许的来源（本地开发）：
-- `localhost:{任意端口}`
-- `auth.localhost`
-- `127.0.0.1`
+允许的来源：
+- `http://{HOST}:{PORT}`（服务自身地址）
+- `http://auth.localhost`
+- `http://localhost`
+- `http://127.0.0.1`
+
+允许的请求方法：`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`
+
+允许的请求头：`Accept`, `Content-Type`, `Authorization`
 
 ---
 
@@ -574,6 +714,7 @@ curl http://auth.localhost/healthz
 | `ZITADEL_SERVICE_PAT` | — | Zitadel 服务账号 Personal Access Token |
 | `ZITADEL_SERVICE_PAT_FILE` | — | PAT 文件路径（与 `ZITADEL_SERVICE_PAT` 二选一） |
 | `ZITADEL_LOGIN_REDIRECT_URI` | `http://auth-service:3000/auth/callback` | OIDC 回调地址 |
+| `ZITADEL_ORG_ID` | — | Zitadel 组织 ID（设置后用户将创建到该组织下） |
 | `ZITADEL_PROJECT_ID` | — | Zitadel 项目 ID（用于角色管理） |
 | `ZITADEL_DEFAULT_ROLE_KEY` | `EduClaw` | 新注册用户默认角色 |
 
@@ -597,11 +738,27 @@ curl http://auth.localhost/healthz
 
 ## 快速接入检查清单
 
+### 前端接入
+
 - [ ] 确认网关地址可达（本地 `http://auth.localhost`）
-- [ ] 实现登录接口调用（密码 或 短信验证码方式）
-- [ ] 安全存储 Token（建议 httpOnly Cookie 或内存）
+- [ ] 实现登录页面（密码 或 短信验证码方式）
+- [ ] 实现注册页面（可选，支持邀请码）
+- [ ] 安全存储 Token（建议 httpOnly Cookie 或内存，避免 localStorage）
 - [ ] 在业务 API 请求中携带 `Authorization: Bearer <access_token>` 头
 - [ ] 处理 401 响应，引导用户重新登录
 - [ ] 实现登出功能，调用 `/auth/logout` 注销 Token
-- [ ] （可选）实现注册流程
-- [ ] （可选）实现邀请码输入逻辑
+- [ ] 使用 `GET /auth/me` 获取当前用户信息和角色
+- [ ] 使用 `GET /healthz` 检查服务可用性
+
+### 后端接入
+
+- [ ] 从 Kong 注入的 `X-User-Id`、`X-User-Username`、`X-User-Email` 头获取用户身份
+- [ ] 不要自行验证 JWT，Kong 已完成验证
+- [ ] 处理用户不存在的情况（Kong 注入了 ID 但用户已被删除）
+
+### 跨域接入（不同域名的业务服务）
+
+- [ ] 从 URL hash `#token=...` 提取 Token 并存入 localStorage
+- [ ] 登出后跳转到 `http://auth.localhost/login?logout=1` 清除 Token
+- [ ] 登录后回跳使用 `http://auth.localhost/login?returnTo=<encoded-url>`
+- [ ] 在 `kong/kong.yml` 中添加业务服务的路由规则

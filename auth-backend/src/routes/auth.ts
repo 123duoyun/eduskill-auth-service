@@ -167,6 +167,15 @@ async function lookupSessionUser(username: string): Promise<{ user: { loginName:
 async function loginWithPassword(username: string, password: string): Promise<LoginTokens> {
   const flow = await startOidcFlow(true);
   const user = await lookupSessionUser(username);
+
+  // 邮箱登录时检查邮箱是否已验证
+  if (username.includes('@') && !username.endsWith('@zitadel.localhost') && 'userId' in user.user) {
+    const verified = await zitadelUser.isEmailVerified(user.user.userId);
+    if (!verified) {
+      throw new Error('请先验证邮箱');
+    }
+  }
+
   const session = await createSession({
     ...user,
     password: { password },
@@ -211,7 +220,7 @@ async function isEmailTaken(email: string): Promise<boolean> {
   return results.length > 0;
 }
 
-async function registerWithPassword(username: string, email: string, password: string): Promise<LoginTokens> {
+async function registerWithPassword(username: string, email: string, password: string): Promise<void> {
   const normalizedEmail = normalizeEmail(email);
   if (await isEmailTaken(normalizedEmail)) {
     throw new Error('该邮箱已被注册');
@@ -221,7 +230,7 @@ async function registerWithPassword(username: string, email: string, password: s
   const userPayload: Record<string, unknown> = {
     username,
     profile: { givenName, familyName: 'User' },
-    email: { email: normalizedEmail, isVerified: true },
+    email: { email: normalizedEmail, isVerified: false },
     password: { password, changeRequired: false },
   };
   if (config.zitadelOrgId) {
@@ -247,7 +256,12 @@ async function registerWithPassword(username: string, email: string, password: s
   }
 
   const created = (await createRes.json()) as { userId?: string };
-  if (created.userId && config.zitadelDefaultRoleKey) {
+  if (!created.userId) {
+    throw new Error('Registration succeeded but userId was not returned');
+  }
+
+  // 分配默认角色
+  if (config.zitadelDefaultRoleKey) {
     try {
       await zitadelUser.assignUserRole(created.userId, config.zitadelDefaultRoleKey);
     } catch (err) {
@@ -255,11 +269,12 @@ async function registerWithPassword(username: string, email: string, password: s
     }
   }
 
-  if (!created.userId) {
-    throw new Error('Registration succeeded but userId was not returned');
+  // 触发 ZITADEL 发送邮箱验证邮件
+  try {
+    await zitadelUser.sendEmailVerification(created.userId);
+  } catch (err) {
+    log.warn({ err, userId: created.userId }, 'Failed to send email verification on registration');
   }
-
-  return loginWithUserIdAndPassword(created.userId, password);
 }
 
 async function runPasswordAuth(mode: AuthMode, req: Request, res: Response): Promise<void> {
@@ -285,12 +300,13 @@ async function runPasswordAuth(mode: AuthMode, req: Request, res: Response): Pro
     }
   }
 
-  const tokens =
-    mode === 'register'
-      ? await registerWithPassword(username, email, password)
-      : await loginWithPassword(username, password);
-
-  res.json(tokens);
+  if (mode === 'register') {
+    await registerWithPassword(username, email, password);
+    res.json({ ok: true });
+  } else {
+    const tokens = await loginWithPassword(username, password);
+    res.json(tokens);
+  }
 }
 
 router.post('/auth/password', async (req: Request, res: Response) => {
@@ -303,7 +319,7 @@ router.post('/auth/password', async (req: Request, res: Response) => {
     await runPasswordAuth(mode, req, res);
   } catch (err: any) {
     log.error({ err }, 'Password auth failed');
-    res.status(400).json({ error: sanitizeError(err, 'Authentication failed') });
+    res.status(400).json({ error: sanitizeError(err, '认证失败') });
   }
 });
 
@@ -349,6 +365,34 @@ router.post('/auth/logout', async (req: Request, res: Response) => {
   } catch (err: any) {
     log.error({ err }, 'Logout failed');
     res.json({ ok: true });
+  }
+});
+
+router.post('/auth/forgot-password', async (req: Request, res: Response) => {
+  const email = req.body?.email?.trim();
+  if (!email) {
+    res.status(400).json({ error: 'email is required' });
+    return;
+  }
+
+  try {
+    // 查找用户（不区分大小写）
+    const results = await zitadelUser.searchUsers([
+      { emailQuery: { emailAddress: email.toLowerCase(), method: 'TEXT_QUERY_METHOD_EQUALS' } },
+    ]);
+
+    if (results.length > 0) {
+      const userId = results[0].userId;
+      if (userId) {
+        await zitadelUser.sendPasswordReset(userId);
+      }
+    }
+
+    // 无论邮箱是否存在都返回成功，防止枚举攻击
+    res.json({ ok: true });
+  } catch (err: any) {
+    log.error({ err, email }, 'Forgot password request failed');
+    res.status(500).json({ error: sanitizeError(err, '发送重置邮件失败') });
   }
 });
 

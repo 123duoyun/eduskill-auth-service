@@ -16,6 +16,7 @@ interface ZitadelHumanUser {
   human?: {
     email?: {
       email?: string;
+      isVerified?: boolean;
     };
   };
   details?: {
@@ -169,4 +170,62 @@ export async function getUserRoles(userId: string): Promise<string[]> {
     }
   }
   return roles;
+}
+
+/**
+ * 触发 ZITADEL 发送密码重置邮件
+ * 调用后 ZITADEL 会向用户已验证的邮箱发送一封包含重置链接的邮件
+ */
+export async function sendPasswordReset(userId: string): Promise<void> {
+  const res = await fetch(`${issuer()}/v2/users/${encodeURIComponent(userId)}/password/reset`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${pat()}`,
+    },
+    body: JSON.stringify({ sendPasswordReset: {} }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Zitadel sendPasswordReset failed (${res.status}): ${text}`);
+  }
+}
+
+/**
+ * 触发 ZITADEL 发送邮箱验证邮件
+ * 注册后调用，ZITADEL 会向用户邮箱发送一封包含验证链接的邮件
+ */
+export async function sendEmailVerification(userId: string): Promise<void> {
+  const res = await fetch(`${issuer()}/v2/users/${encodeURIComponent(userId)}/email/verification`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${pat()}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Zitadel sendEmailVerification failed (${res.status}): ${text}`);
+  }
+}
+
+/**
+ * 查询用户邮箱验证状态
+ * 通过 ZITADEL GET /v2/users/{userId} 获取用户详情中的 isVerified 字段
+ */
+export async function isEmailVerified(userId: string): Promise<boolean> {
+  const res = await fetch(`${issuer()}/v2/users/${encodeURIComponent(userId)}`, {
+    headers: { Authorization: `Bearer ${pat()}` },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Zitadel getUser failed (${res.status}): ${text}`);
+  }
+
+  const json = (await res.json()) as { user?: ZitadelHumanUser };
+  return json.user?.human?.email?.isVerified === true;
 }
