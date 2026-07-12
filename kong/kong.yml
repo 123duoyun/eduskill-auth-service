@@ -1,6 +1,16 @@
 _format_version: "3.0"
 
 services:
+  - name: auth-frontend-pages
+    url: http://auth-frontend:80
+    routes:
+      - name: auth-service-html
+        hosts:
+          - __KONG_APP_HOST__
+        paths:
+          - /
+        strip_path: false
+        preserve_host: true
   - name: educlaw-auth
     url: http://auth-backend:3000
     routes:
@@ -19,36 +29,19 @@ services:
               require_token: false
               expected_issuer: "__ZITADEL_ISSUER__"
               expected_audience: "__ZITADEL_CLIENT_ID__"
-
-  - name: educlaw-api
-    url: http://educlaw-server:3000
-    connect_timeout: 5000
-    read_timeout: 3600000
-    write_timeout: 3600000
+  - name: inno-agent-api
+    url: http://__INNO_AGENT_BACKEND_HOST__
     routes:
-      - name: educlaw-protected
+      - name: inno-agent-api-routes
         hosts:
           - __KONG_APP_HOST__
         paths:
-          - /agents
-          - /profiles
           - /api
-          - /llm
-          - /events
         strip_path: false
+        preserve_host: true
         plugins:
           - name: oidc-jwt-auth
             config:
               require_token: true
               expected_issuer: "__ZITADEL_ISSUER__"
               expected_audience: "__ZITADEL_CLIENT_ID__"
-
-  - name: educlaw-web
-    url: http://educlaw-web:80
-    routes:
-      - name: educlaw-web-root
-        hosts:
-          - __KONG_APP_HOST__
-        paths:
-          - /
-        strip_path: false

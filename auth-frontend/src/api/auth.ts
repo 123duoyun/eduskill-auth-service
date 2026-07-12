@@ -76,17 +76,17 @@ export function getPostAuthDestination(): string {
   const token = localStorage.getItem(TOKEN_KEY);
   const returnTo = getReturnToParam();
 
-  if (!returnTo) return '/nav';
+  if (!returnTo) return '/sandbox';
 
   try {
     const target = new URL(returnTo, window.location.origin);
-    if (!isAllowedReturnToTarget(target)) return '/nav';
+    if (!isAllowedReturnToTarget(target)) return '/sandbox';
     if (target.origin !== window.location.origin && token) {
       target.hash = 'token=' + encodeURIComponent(token);
     }
     return target.toString();
   } catch {
-    return '/nav';
+    return '/sandbox';
   }
 }
 

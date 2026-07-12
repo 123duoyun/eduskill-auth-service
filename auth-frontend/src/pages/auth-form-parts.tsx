@@ -44,7 +44,7 @@ export function AuthPageShell({
 
       <div className={gridClassName}>
         <section className="hidden pl-[7vw] lg:block xl:pl-[6vw]">
-          <h1 className={`${heroTitleClass} font-semibold tracking-[0] text-[#0a0a28]`}>
+          <h1 className={`${heroTitleClass} font-bold bg-linear-to-r from-[#594eff] via-[#8667f1] to-[#5a73fd] bg-clip-text text-transparent`}>
             {t('common.platformName')}
           </h1>
           <p className={`mt-6 ${heroTaglineClass} font-medium tracking-[0] text-[#545465]`}>

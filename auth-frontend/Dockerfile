@@ -3,6 +3,7 @@
 FROM node:20-slim AS builder
 
 ARG VITE_API_BASE
+ARG VITE_SANDBOX_WORKSPACE_URL_TEMPLATE
 
 RUN corepack enable && corepack prepare pnpm@10.30.2 --activate
 WORKDIR /app

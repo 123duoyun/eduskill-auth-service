@@ -13,12 +13,15 @@ services:
       # Zitadel OIDC（用于 JWT 校验）
       - ZITADEL_ISSUER=${ZITADEL_ISSUER}
       - ZITADEL_CLIENT_ID=${ZITADEL_CLIENT_ID}
+      # 沙箱后端地址（用于 kong.yml 模板替换）
+      - INNO_AGENT_BACKEND_HOST=${INNO_AGENT_BACKEND_HOST:-inno-agent-backend:3000}
     command: >-
       sh -c 'awk
       "{gsub(/__KONG_APP_HOST__/,\"$$KONG_APP_HOST\");
       gsub(/__KONG_AUTH_HOST__/,\"$$KONG_AUTH_HOST\");
       gsub(/__ZITADEL_ISSUER__/,\"$$ZITADEL_ISSUER\");
-      gsub(/__ZITADEL_CLIENT_ID__/,\"$$ZITADEL_CLIENT_ID\"); print}"
+      gsub(/__ZITADEL_CLIENT_ID__/,\"$$ZITADEL_CLIENT_ID\");
+      gsub(/__INNO_AGENT_BACKEND_HOST__/,\"$$INNO_AGENT_BACKEND_HOST\"); print}"
       /etc/kong/kong.yml > /tmp/kong.yml
       && exec /docker-entrypoint.sh kong docker-start'
     volumes:
@@ -66,6 +69,21 @@ services:
       - INVITE_REQUIRED=${INVITE_REQUIRED:-false}
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
+    networks:
+      - internal-net
+    restart: unless-stopped
+  auth-frontend:
+    build:
+      context: .
+      dockerfile: auth-frontend/Dockerfile
+      args:
+        - VITE_API_BASE=${VITE_API_BASE:-}
+        - VITE_SANDBOX_WORKSPACE_URL_TEMPLATE=${VITE_SANDBOX_WORKSPACE_URL_TEMPLATE:-}
+    image: auth-frontend:latest
+    environment:
+      - API_UPSTREAM=http://auth-backend:3000
+    depends_on:
+      - auth-backend
     networks:
       - internal-net
     restart: unless-stopped

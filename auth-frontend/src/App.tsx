@@ -5,7 +5,8 @@ import { AuthI18nProvider, useAuthI18n } from '@/i18n/auth-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
-import { NavPage } from '@/pages/NavPage'
+import { SandboxPage } from '@/pages/SandboxPage'
+import { AccountSettingsPage } from '@/pages/AccountSettingsPage'
 
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -46,13 +47,16 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={
-        isAuthenticated ? <Navigate to="/nav" replace /> : <LoginPage />
+        isAuthenticated ? <Navigate to="/sandbox" replace /> : <LoginPage />
       } />
       <Route path="/register" element={
-        isAuthenticated ? <Navigate to="/nav" replace /> : <RegisterPage />
+        isAuthenticated ? <Navigate to="/sandbox" replace /> : <RegisterPage />
       } />
-      <Route path="/nav" element={
-        <RequireAuth><NavPage /></RequireAuth>
+      <Route path="/sandbox" element={
+        <RequireAuth><SandboxPage /></RequireAuth>
+      } />
+      <Route path="/sandbox/account" element={
+        <RequireAuth><AccountSettingsPage /></RequireAuth>
       } />
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/portal" element={<Navigate to="/login" replace />} />
