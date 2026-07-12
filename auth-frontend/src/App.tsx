@@ -33,7 +33,7 @@ function AppRoutes() {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="rounded-[28px] border border-border/70 bg-card/88 px-8 py-6 shadow-lg backdrop-blur">
           <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-muted-foreground/60">
             {t('common.loadingEyebrow')}

@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # ---- Build Stage ----
 FROM node:20-slim AS builder
 RUN corepack enable && corepack prepare pnpm@10.30.2 --activate

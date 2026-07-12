@@ -40,14 +40,12 @@ export function UserPanel({ user, onDisconnect, disconnecting }: UserPanelProps)
   }, [handleDisconnect])
 
   return (
-    <DropdownMenu.Root open={showPanel} onOpenChange={setShowPanel}>
+    <DropdownMenu.Root open={showPanel} onOpenChange={setShowPanel} modal={false}>
       {/* Floating button — bottom-left */}
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          onClick={() => setShowPanel((v) => !v)}
-          onPointerDown={(e) => e.preventDefault()}
-          className="fixed bottom-4 left-4 z-50 flex h-14 max-w-[220px] cursor-pointer items-center gap-2 overflow-hidden rounded-lg px-3 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground"
+          className="fixed bottom-4 left-4 z-50 flex h-14 max-w-[220px] cursor-pointer items-center gap-2 overflow-hidden rounded-lg border-0 px-3 text-sm outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground focus:outline-none focus-visible:outline-none"
           title={t('sandbox.userMenu')}
         >
           <span className="flex size-8 shrink-0 overflow-hidden rounded-full">

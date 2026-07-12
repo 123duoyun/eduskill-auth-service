@@ -410,11 +410,139 @@ router.get('/auth/me', requireOidcUser, async (req: Request, res: Response) => {
       res.status(401).json({ error: 'User not found' });
       return;
     }
-    const roles = await zitadelUser.getUserRoles(userId);
-    res.json({ ...user, roles });
+    const [roles, metadata] = await Promise.all([
+      zitadelUser.getUserRoles(userId),
+      zitadelUser.getUserMetadata(userId).catch((err) => {
+        log.warn({ err, userId }, 'Failed to fetch user metadata');
+        return {} as Record<string, string>;
+      }),
+    ]);
+
+    // 从 metadata 中解析 school / region
+    let school: string | undefined;
+    let region: zitadelUser.RegionInfo | null | undefined;
+    if (metadata.school) school = metadata.school;
+    if (metadata.region) {
+      try {
+        region = JSON.parse(metadata.region) as zitadelUser.RegionInfo;
+      } catch {
+        region = null;
+      }
+    }
+
+    res.json({ ...user, roles, school, region });
   } catch (err: any) {
     log.error({ err }, 'Failed to fetch user info');
     res.status(500).json({ error: sanitizeError(err, '获取用户信息失败') });
+  }
+});
+
+// ─── 账号管理:更新用户信息 ───────────────────────────────────────────────────
+
+router.patch('/auth/profile/username', requireOidcUser, async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    const username = req.body?.username?.trim();
+    if (!username) {
+      res.status(400).json({ error: '用户名不能为空' });
+      return;
+    }
+    await zitadelUser.updateUsername(userId, username);
+    res.json({ ok: true });
+  } catch (err: any) {
+    log.error({ err }, 'Update username failed');
+    res.status(400).json({ error: sanitizeError(err, '更新用户名失败') });
+  }
+});
+
+router.put('/auth/profile/school', requireOidcUser, async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    const school = req.body?.school;
+    if (typeof school !== 'string' || !school.trim()) {
+      res.status(400).json({ error: '学校名称不能为空' });
+      return;
+    }
+    await zitadelUser.setUserMetadata(userId, 'school', school.trim());
+    res.json({ ok: true });
+  } catch (err: any) {
+    log.error({ err }, 'Update school failed');
+    res.status(400).json({ error: sanitizeError(err, '更新学校失败') });
+  }
+});
+
+router.put('/auth/profile/region', requireOidcUser, async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    const region = req.body?.region;
+    if (!region || typeof region !== 'object') {
+      res.status(400).json({ error: '地区信息不合法' });
+      return;
+    }
+    const { country, province, city, district } = region;
+    if (!country || !province) {
+      res.status(400).json({ error: '国家和省份为必填项' });
+      return;
+    }
+    const regionInfo: zitadelUser.RegionInfo = { country, province, city: city || '', district: district || '' };
+    await zitadelUser.setUserMetadata(userId, 'region', JSON.stringify(regionInfo));
+    res.json({ ok: true });
+  } catch (err: any) {
+    log.error({ err }, 'Update region failed');
+    res.status(400).json({ error: sanitizeError(err, '更新地区失败') });
+  }
+});
+
+router.post('/auth/change-password', requireOidcUser, async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    const { phone, code, otpId, newPassword } = req.body || {};
+    if (!phone || !code || !otpId || !newPassword) {
+      res.status(400).json({ error: 'phone, code, otpId, newPassword 必填' });
+      return;
+    }
+
+    // 1. 校验 OTP
+    const check = verifyOtpEntry(otpId, code);
+    if (!check.ok) {
+      res.status(400).json({ error: check.error });
+      return;
+    }
+
+    // 2. 校验手机号归属当前用户(从 ZITADEL 用户信息取 phone 比对)
+    const user = await zitadelUser.findById(userId);
+    if (!user) {
+      res.status(401).json({ error: '用户不存在' });
+      return;
+    }
+    const e164Phone = toE164Phone(phone);
+    if (user.phone !== e164Phone) {
+      res.status(403).json({ error: '手机号与当前账号不匹配' });
+      return;
+    }
+
+    // 3. 调用 ZITADEL 设密
+    await zitadelUser.setPassword(userId, newPassword);
+    res.json({ ok: true });
+  } catch (err: any) {
+    log.error({ err }, 'Change password failed');
+    res.status(400).json({ error: sanitizeError(err, '修改密码失败') });
   }
 });
 
@@ -456,7 +584,7 @@ async function registerWithPhone(
   phone: string,
   username: string,
   password: string,
-): Promise<LoginTokens> {
+): Promise<void> {
   const givenName = username.replace(/[^a-zA-Z0-9]/g, '') || username;
   const e164Phone = toE164Phone(phone);
   const userPayload: Record<string, unknown> = {
@@ -496,8 +624,6 @@ async function registerWithPhone(
   if (!created.userId) {
     throw new Error('Registration succeeded but userId was not returned');
   }
-
-  return loginWithUserIdAndPassword(created.userId, password);
 }
 
 // ─── SMS 验证码端点 ──────────────────────────────────────────────────────────

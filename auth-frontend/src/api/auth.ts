@@ -2,10 +2,20 @@ import { apiFetch } from './client';
 
 const BASE = '';
 
+export interface RegionInfo {
+  country: string;
+  province: string;
+  city: string;
+  district: string;
+}
+
 export interface AuthUser {
   id: string;
   username: string;
   email?: string;
+  phone?: string;
+  school?: string;
+  region?: RegionInfo | null;
   roles: string[];
 }
 
@@ -181,4 +191,45 @@ export async function registerWithSms(
   persistTokens(
     await postJson<TokenResponse>('/auth/sms/register', { phone, code, otpId, username, password }),
   );
+}
+
+// ─── 账号管理:更新用户信息 ───────────────────────────────────────────────────
+
+async function patchJson<T>(url: string, body: Record<string, unknown>): Promise<T> {
+  const res = await apiFetch(`${BASE}${url}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return parseApiResponse<T>(res);
+}
+
+async function putJson<T>(url: string, body: Record<string, unknown>): Promise<T> {
+  const res = await apiFetch(`${BASE}${url}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return parseApiResponse<T>(res);
+}
+
+export async function updateUsername(username: string): Promise<void> {
+  await patchJson('/auth/profile/username', { username });
+}
+
+export async function updateSchool(school: string): Promise<void> {
+  await putJson('/auth/profile/school', { school });
+}
+
+export async function updateRegion(region: RegionInfo): Promise<void> {
+  await putJson('/auth/profile/region', { region });
+}
+
+export async function changePassword(
+  phone: string,
+  code: string,
+  otpId: string,
+  newPassword: string,
+): Promise<void> {
+  await postJson('/auth/change-password', { phone, code, otpId, newPassword });
 }
