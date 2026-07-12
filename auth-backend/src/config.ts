@@ -25,4 +25,5 @@ export const config = {
   aliyunSmsTemplateCode: process.env.ALIYUN_SMS_TEMPLATE_CODE || '',
   inviteCodes: (process.env.INVITE_CODES || '').split(',').map((c: string) => c.trim()).filter(Boolean),
   inviteRequired: (process.env.INVITE_REQUIRED || 'false').toLowerCase() === 'true',
+  emailVerificationRequired: (process.env.EMAIL_VERIFICATION_REQUIRED || 'true').toLowerCase() !== 'false',
 };

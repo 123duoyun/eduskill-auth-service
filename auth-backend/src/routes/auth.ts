@@ -169,7 +169,7 @@ async function loginWithPassword(username: string, password: string): Promise<Lo
   const user = await lookupSessionUser(username);
 
   // 邮箱登录时检查邮箱是否已验证
-  if (username.includes('@') && !username.endsWith('@zitadel.localhost') && 'userId' in user.user) {
+  if (config.emailVerificationRequired && username.includes('@') && !username.endsWith('@zitadel.localhost') && 'userId' in user.user) {
     const verified = await zitadelUser.isEmailVerified(user.user.userId);
     if (!verified) {
       throw new Error('请先验证邮箱');
@@ -230,7 +230,7 @@ async function registerWithPassword(username: string, email: string, password: s
   const userPayload: Record<string, unknown> = {
     username,
     profile: { givenName, familyName: 'User' },
-    email: { email: normalizedEmail, isVerified: false },
+    email: { email: normalizedEmail, isVerified: !config.emailVerificationRequired },
     password: { password, changeRequired: false },
   };
   if (config.zitadelOrgId) {
@@ -270,10 +270,12 @@ async function registerWithPassword(username: string, email: string, password: s
   }
 
   // 触发 ZITADEL 发送邮箱验证邮件
-  try {
-    await zitadelUser.sendEmailVerification(created.userId);
-  } catch (err) {
-    log.warn({ err, userId: created.userId }, 'Failed to send email verification on registration');
+  if (config.emailVerificationRequired) {
+    try {
+      await zitadelUser.sendEmailVerification(created.userId);
+    } catch (err) {
+      log.warn({ err, userId: created.userId }, 'Failed to send email verification on registration');
+    }
   }
 }
 

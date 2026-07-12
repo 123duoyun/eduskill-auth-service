@@ -67,6 +67,8 @@ services:
       # 邀请码配置
       - INVITE_CODES=${INVITE_CODES:-}
       - INVITE_REQUIRED=${INVITE_REQUIRED:-false}
+      # 邮箱验证配置
+      - EMAIL_VERIFICATION_REQUIRED=${EMAIL_VERIFICATION_REQUIRED:-true}
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
     networks:
