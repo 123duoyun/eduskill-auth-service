@@ -49,7 +49,7 @@ export function UserPanel({ user, onDisconnect, disconnecting }: UserPanelProps)
           title={t('sandbox.userMenu')}
         >
           <span className="flex size-8 shrink-0 overflow-hidden rounded-full">
-            <span className="flex size-full items-center justify-center bg-primary text-xs font-semibold text-primary-foreground">
+            <span className="flex size-full items-center justify-center bg-[#555AFF] text-xs font-semibold text-primary-foreground">
               {avatarInitial}
             </span>
           </span>

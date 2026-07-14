@@ -63,7 +63,7 @@ export function PhoneInput({
   if (variant === "pill") {
     return (
       <div className={cn("flex h-[58px] items-center rounded-full border border-transparent bg-[#f4f4f4] px-6 transition-[border-color,background-color,box-shadow] sm:h-[66px]", className)}>
-        <span className="h-full shrink-0 px-0 py-0 text-[17px] font-medium text-[#0a0a28] sm:text-[20px]">
+        <span className="flex h-full shrink-0 items-center px-0 py-0 text-[17px] font-medium text-[#0a0a28] sm:text-[20px]">
           {DEFAULT_COUNTRY.code}
         </span>
         <input
