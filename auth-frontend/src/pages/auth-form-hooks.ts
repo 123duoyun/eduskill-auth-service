@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 
-export function useCountdown(seconds = 60) {
+export function useCountdown(seconds = 1800) {
   const [countdown, setCountdown] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
